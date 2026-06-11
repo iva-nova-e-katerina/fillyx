@@ -33,20 +33,11 @@ pub fn init() {
         base: &GDT as *const _ as u64,
     };
     unsafe {
-        asm!("lgdt [{}]", in(reg) &gdtr, options(readonly, nostack));
-        asm!(
-            "mov ax, 0x10",
-            "mov ds, ax",
-            "mov es, ax",
-            "mov fs, ax",
-            "mov gs, ax",
-            "mov ss, ax",
-            "push 0x08",
-            "lea rax, [rip + 9f]",
-            "push rax",
-            "retfq",
-            "9:",
-            options(preserves_flags),
-        );
+        asm!("lgdt [{0}]", in(reg) &gdtr, options(nostack, preserves_flags));
+        asm!("mov ds, ax", in("ax") 0x10u16, options(nostack, preserves_flags));
+        asm!("mov es, ax", in("ax") 0x10u16, options(nostack, preserves_flags));
+        asm!("mov fs, ax", in("ax") 0x10u16, options(nostack, preserves_flags));
+        asm!("mov gs, ax", in("ax") 0x10u16, options(nostack, preserves_flags));
+        asm!("mov ss, ax", in("ax") 0x10u16, options(nostack, preserves_flags));
     }
 }
