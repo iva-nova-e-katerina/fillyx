@@ -1,0 +1,42 @@
+# Rust build artifacts and dependencies
+/target/
+**/*.rs.bk
+*.rs.bk
+
+# Cargo.lock – ignore for libraries, commit for binaries (commented by default)
+# Cargo.lock
+
+# Debugging & profiling files
+*.pdb
+*.dSYM
+*.prof
+*.gcda
+*.gcno
+
+# Editor and IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.code-workspace
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Test & benchmark outputs
+*.bench
+*.html
+*.lcov
+*.gcov
+
+# Documentation (if generated locally)
+/docs/
+/target/doc/
+
+# Sensitive environment files
+.env
+*.secret
+AGENTS.md
+/tools/
