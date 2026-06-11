@@ -19,9 +19,7 @@ SECTIONS {
 
     .data : ALIGN(4K) {
         *(.data .data.*)
-    }
-
-    .bss : ALIGN(4K) {
+        *(.got .got.*)
         *(COMMON)
         *(.bss .bss.*)
     }

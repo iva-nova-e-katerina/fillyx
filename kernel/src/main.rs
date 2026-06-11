@@ -1,72 +1,128 @@
 #![no_std]
 #![no_main]
 
-use core::arch::asm;
-use limine::BaseRevision;
-use limine::RequestsStartMarker;
-use limine::RequestsEndMarker;
+pub mod arch;
+pub mod fs;
+pub mod llm_hooks;
+pub mod memory;
+pub mod process;
 
-#[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
-    loop { unsafe { asm!("hlt"); } }
-}
+use core::panic::PanicInfo;
 
-#[used]
-#[no_mangle]
-#[link_section = ".limine_reqs"]
-static BASE_REVISION: BaseRevision = BaseRevision::new();
+use limine::request::{
+    FramebufferRequest, HhdmRequest, MemmapRequest, ModulesRequest, StackSizeRequest,
+};
+use limine::{BaseRevision, RequestsEndMarker, RequestsStartMarker};
 
 #[used]
-#[no_mangle]
 #[link_section = ".limine_reqs"]
 static START_MARKER: RequestsStartMarker = RequestsStartMarker::new();
 
 #[used]
-#[no_mangle]
+#[link_section = ".limine_reqs"]
+static BASE_REVISION: BaseRevision = BaseRevision::new();
+
+#[used]
+#[link_section = ".limine_reqs"]
+static FRAMEBUFFER_REQUEST: FramebufferRequest = FramebufferRequest::new();
+
+#[used]
+#[link_section = ".limine_reqs"]
+static HHDM_REQUEST: HhdmRequest = HhdmRequest::new();
+
+#[used]
+#[link_section = ".limine_reqs"]
+static MEMORY_MAP_REQUEST: MemmapRequest = MemmapRequest::new();
+
+#[used]
+#[link_section = ".limine_reqs"]
+static MODULE_REQUEST: ModulesRequest = ModulesRequest::new();
+
+#[used]
+#[link_section = ".limine_reqs"]
+static STACK_SIZE_REQUEST: StackSizeRequest = StackSizeRequest::new(32768);
+
+#[used]
 #[link_section = ".limine_reqs"]
 static END_MARKER: RequestsEndMarker = RequestsEndMarker::new();
 
-fn serial_init() {
-    unsafe {
-        asm!("out dx, al", in("dx") 0x3FBu16, in("al") 0x80u8);
-        asm!("out dx, al", in("dx") 0x3F8u16, in("al") 0x01u8);
-        asm!("out dx, al", in("dx") 0x3F9u16, in("al") 0x00u8);
-        asm!("out dx, al", in("dx") 0x3FBu16, in("al") 0x03u8);
-        asm!("out dx, al", in("dx") 0x3FAu16, in("al") 0x00u8);
-        asm!("out dx, al", in("dx") 0x3FCu16, in("al") 0x00u8);
+#[panic_handler]
+fn panic(info: &PanicInfo) -> ! {
+    arch::serial::write(b"PANIC: ");
+    if let Some(msg) = info.message().as_str() {
+        arch::serial::write(msg.as_bytes());
     }
-}
-
-fn serial_tx_ready() -> bool {
-    let result: u8;
-    unsafe {
-        asm!("in al, dx", out("al") result, in("dx") 0x3FDu16);
-    }
-    result & 0x20 != 0
-}
-
-fn serial_write(byte: u8) {
-    while !serial_tx_ready() {
-        unsafe { asm!("pause"); }
-    }
-    unsafe {
-        asm!("out dx, al", in("dx") 0x3F8u16, in("al") byte);
-    }
-}
-
-fn serial_write_str(s: &str) {
-    for &byte in s.as_bytes() {
-        if byte == b'\n' {
-            serial_write(b'\r');
+    arch::serial::write(b"\n");
+    loop {
+        unsafe {
+            core::arch::asm!("hlt");
         }
-        serial_write(byte);
     }
 }
 
 #[no_mangle]
-pub extern "C" fn _start() -> ! {
-    serial_init();
-    serial_write_str("Fillyx v0.1 booting...\n");
-    serial_write_str("Kernel ready.\n");
-    loop { unsafe { asm!("hlt"); } }
+pub extern "C" fn kernel_main() -> ! {
+    arch::serial::init();
+    arch::serial::write(b"Fillyx OS v0.1.0\n");
+
+    let hhdm = HHDM_REQUEST
+        .response()
+        .expect("HHDM request failed");
+    let hhdm_offset = hhdm.offset;
+
+    let memory_map = MEMORY_MAP_REQUEST
+        .response()
+        .expect("Memory map request failed");
+    let entries = memory_map.entries();
+
+    memory::init(entries, hhdm_offset);
+    arch::serial::write(b"[OK] Memory init\n");
+
+    arch::gdt::init();
+    arch::serial::write(b"[OK] GDT init\n");
+
+    arch::idt::init();
+    arch::serial::write(b"[OK] IDT init\n");
+
+    arch::interrupts::init();
+    arch::serial::write(b"[OK] Interrupts init\n");
+
+    fs::init();
+    arch::serial::write(b"[OK] VFS init\n");
+
+    process::init();
+    arch::serial::write(b"[OK] Process init\n");
+
+    llm_hooks::init();
+    arch::serial::write(b"[OK] LLM hooks init\n");
+
+    let logo = b"\n   __ _ _ _      _\n  / _(_) | |    | |\n | |_ _| | |    | |_ _   _ _ __   ___\n |  _| | | |    | __| | | | '_ \\ / _ \\\n | | | | | |____| |_| |_| | |_) |  __/\n |_| |_|_|______|\\__|\\__, | .__/ \\___|\n                      __/ | |\n                     |___/|_|\n\n";
+    arch::serial::write(logo);
+    arch::serial::write(b"LLM-native OS ready.\n");
+
+    loop {
+        unsafe {
+            core::arch::asm!("hlt");
+        }
+    }
 }
+
+core::arch::global_asm!(
+    ".globl _start",
+    ".section .text, \"ax\"",
+    ".type _start, @function",
+    "_start:",
+    "cli",
+    "lea rsp, [rip + _stack_end]",
+    "and rsp, -16",
+    "xor rbp, rbp",
+    "call kernel_main",
+    "cli",
+    "1: hlt",
+    "jmp 1b",
+    ".section .bss, \"aw\", @nobits",
+    ".balign 16",
+    "_stack_begin:",
+    ".space 32768",
+    "_stack_end:",
+);

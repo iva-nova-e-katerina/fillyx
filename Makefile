@@ -7,14 +7,14 @@ TOOLS_DIR := tools/limine-binary
 KERNEL_ELF := $(BUILD_DIR)/fillyx-kernel
 ISO_FILE := fillyx.iso
 
-export RUSTFLAGS := -Clink-arg=-Tkernel/linker.ld
+export RUSTFLAGS := -Crelocation-model=static -Clink-arg=-T$(CURDIR)/kernel/linker.ld -Clink-arg=--no-dynamic-linker -Clink-arg=--no-pie -Clink-arg=--omagic
 
 .PHONY: all kernel iso run clean
 
 all: kernel iso
 
 kernel:
-	. "$$HOME/.cargo/env" && cargo build --release --manifest-path $(KERNEL_DIR)/Cargo.toml
+	. "$$HOME/.cargo/env" && cargo build --release --target $(TARGET) --manifest-path $(KERNEL_DIR)/Cargo.toml 2>&1
 	cp $(KERNEL_ELF) $(ISO_DIR)/boot/fillyx-kernel.elf
 
 iso: kernel
