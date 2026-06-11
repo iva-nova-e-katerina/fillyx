@@ -3,16 +3,30 @@ ENTRY(_start)
 SECTIONS {
     . = 0xFFFFFFFF80000000;
 
-    .all : ALIGN(4K) {
-        KEEP(*(.limine_reqs))
-        . = ALIGN(4K);
-        KEEP(*(.text.entry))
-        *(.text .text.*)
-        *(.rodata .rodata.*)
+    .limine_reqs_start : ALIGN(8) { KEEP(*(.limine_reqs_start)) }
+    .limine_reqs      : ALIGN(8) { KEEP(*(.limine_reqs))      }
+    .limine_reqs_end  : ALIGN(8) { KEEP(*(.limine_reqs_end))  }
+
+    . = ALIGN(4K);
+
+    .text.entry : ALIGN(4K) { KEEP(*(.text.entry)) }
+
+    .text : ALIGN(4K) { *(.text .text.*) }
+
+    .rodata : ALIGN(4K) { *(.rodata .rodata.*) }
+
+    .data : ALIGN(4K) {
         *(.data .data.*)
-        *(COMMON)
         *(.data.stack)
+        *(.got .got.*)
+        *(COMMON)
+    }
+
+    .bss : ALIGN(4K) {
+        _bss_start = .;
         *(.bss .bss.*)
-        . += 0x100000;
+        *(COMMON)
+        . += 0x80000;
+        _bss_end = .;
     }
 }

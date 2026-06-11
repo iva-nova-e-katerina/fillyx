@@ -7,7 +7,7 @@ TOOLS_DIR := tools/limine-binary
 KERNEL_ELF := $(BUILD_DIR)/fillyx-kernel
 ISO_FILE := fillyx.iso
 
-export RUSTFLAGS := -Crelocation-model=static -Clink-arg=-T$(CURDIR)/kernel/linker.ld -Clink-arg=--no-dynamic-linker -Clink-arg=--no-pie -Clink-arg=--omagic
+export RUSTFLAGS := -Crelocation-model=static -Clink-arg=-T$(CURDIR)/kernel/linker.ld -Clink-arg=--no-dynamic-linker -Clink-arg=--no-pie
 
 .PHONY: all kernel iso run clean
 

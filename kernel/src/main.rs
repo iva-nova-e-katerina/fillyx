@@ -50,8 +50,19 @@ fn panic(_info: &PanicInfo) -> ! {
 
 #[no_mangle]
 pub extern "C" fn kernel_main() -> ! {
-    arch::serial::init();
-    arch::serial::write(b"F\n");
+    unsafe {
+        asm!("out dx, al", in("dx") 0x3FBu16, in("al") 0x80u8);
+        asm!("out dx, al", in("dx") 0x3F8u16, in("al") 0x01u8);
+        asm!("out dx, al", in("dx") 0x3F9u16, in("al") 0x00u8);
+        asm!("out dx, al", in("dx") 0x3FBu16, in("al") 0x03u8);
+        asm!("out dx, al", in("dx") 0x3FAu16, in("al") 0xC7u8);
+        asm!("out dx, al", in("dx") 0x3FCu16, in("al") 0x0Bu8);
+    }
+    let lsr: u8;
+    unsafe { asm!("in al, dx", out("al") lsr, in("dx") 0x3FDu16); }
+    if lsr & 0x20 != 0 {
+        unsafe { asm!("out dx, al", in("dx") 0x3F8u16, in("al") b'F'); }
+    }
     loop { unsafe { asm!("hlt"); } }
 }
 
@@ -71,10 +82,8 @@ core::arch::global_asm!(
 
     ".pushsection .data.stack, \"aw\"",
     ".balign 4096",
-    ".globl _stack_begin",
     "_stack_begin:",
     ".space 16384",
-    ".globl _stack_end",
     "_stack_end:",
     ".popsection",
 );

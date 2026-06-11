@@ -1,7 +1,0 @@
-[target.x86_64-unknown-none]
-rustflags = [
-    "-Crelocation-model=static",
-    "-Clink-arg=-T$(CURDIR)/kernel/linker.ld",
-    "-Clink-arg=--no-dynamic-linker",
-    "-Clink-arg=--no-pie",
-]
